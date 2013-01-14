@@ -38,10 +38,10 @@
 -export([match/2,match/3,best_match/2,best_match/3,matches/2,matches/3,
 	 sub/3,sub/4,gsub/3,gsub/4,split/2,split/3]).
 
--import(string, [substr/2,substr/3]).
--import(lists, [reverse/1,reverse/2,duplicate/2]).
--import(lists, [member/2,usort/2,keysearch/3,keysort/2,keydelete/3]).
--import(lists, [map/2,foldl/3]).
+-import(string, [substr/3]).
+-import(lists, [reverse/1,duplicate/2]).
+-import(lists, [member/2,usort/2,keysort/2]).
+-import(lists, [foldl/3]).
 
 %%-compile([export_all]).
 
