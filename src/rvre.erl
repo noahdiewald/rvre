@@ -104,9 +104,7 @@
 %% parse(String) -> {ok,RegExp} | {error,Error}.
 %%  Parse a regular expression string. No flags affect the parsing.
 -spec parse(string()) -> {ok, syntax()} | {error, term()}.
-parse(Cs) -> parse1(Cs, parse_cflags([])).	%Default flags
-
-parse1(Cs, _) ->				%Flags not used here!
+parse(Cs) -> 
     case reg(Cs) of
 	{ok,R,[]} -> {ok,{regexp,R}};
 	{ok,_R,[C|_]} -> {error,{illegal,[C]}};
@@ -121,9 +119,9 @@ reg(Cs0) ->
 	{parse_error,E} -> {error,E}
     end.
 
-parse_error(E) -> throw({parse_error,E}).
-
 reg(Cs, Sn) -> alt(Cs, Sn).
+
+parse_error(E) -> throw({parse_error,E}).
 
 alt(Cs0, Sn0) ->
     {L,Sn1,Cs1} = seq(Cs0, Sn0),
