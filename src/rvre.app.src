@@ -1,0 +1,6 @@
+{application, rvre, [
+                     {description, "Rober Virding's regular expressions for Erlang."},
+                     {vsn, git},
+                     {registered, []},
+                     {applications, [kernel]}
+                    ]}.
