@@ -670,7 +670,7 @@ compile(RE) -> compile(RE, []).			%Default flags
 compile(RE, Fls) -> compile1(RE, parse_cflags(Fls)).
 
 compile1(Cs, Fl) when is_list(Cs) ->
-    case parse1(Cs, Fl) of
+    case parse(Cs) of
 	{ok,R} -> compile1(R, Fl);
 	Error -> Error
     end;
