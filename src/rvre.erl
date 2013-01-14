@@ -83,8 +83,26 @@
 %%  The grammar of the current regular expressions. The actual parser
 %%  is a recursive descent implementation of the grammar.
 
-%% reg(Chars) -> {ok,{RegExp,SúbCount},RestChars}.
+-type alt() :: {alt, [rcomp()]}.
+-type range() :: {range, char(), char()}.
+-type comp_class() :: {comp_class, [range()|char()]}.
+-type char_class() :: {char_class, [range()|char()]}.
+-type lit() :: {lit, string()}.
+-type subexp() :: {sub, rcomp(), integer()}.
+-type single() :: epsilon|bos|eos|any|char_class()|comp_class()|lit()|subexp().
+-type kclosure() :: {kclosure, single()}.
+-type pclosure() :: {pclosure, single()}.
+-type optional() :: {optional, single()}.
+-type interval() :: {interval, single(), integer(), integer()}.
+-type repeat() :: kclosure()|pclosure()|optional()|interval()|single().
+-type seq() :: {seq, [repeat()]}.
+-type rcomp() :: repeat()|seq()|alt().
+-type syntax() :: {regexp, {rcomp(), integer()}}.
 
+-export_type([syntax/0,rcomp/0]).
+
+%% reg(Chars) -> {ok,{RegExp,SúbCount},RestChars}.
+-spec reg(string()) -> {ok, syntax(), string()} | {error, term()}.
 reg(Cs0) ->
     case catch reg(Cs0, 0) of
 	{RE,Sc,Cs1} -> {ok,{RE,Sc},Cs1};
@@ -635,7 +653,7 @@ sh_special_char(C) -> special_char(C).
 
 %% parse(String) -> {ok,RegExp} | {error,Error}.
 %%  Parse a regular expression string. No flags affect the parsing.
-
+-spec parse(string()) -> {ok, syntax()} | {error, term()}.
 parse(Cs) -> parse1(Cs, parse_cflags([])).	%Default flags
 
 parse1(Cs, _) ->				%Flags not used here!
