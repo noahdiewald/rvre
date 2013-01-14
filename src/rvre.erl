@@ -387,8 +387,8 @@ comp({char_class,Cc}, Nfa, St) ->
 comp({comp_class,Cc}, Nfa, St) ->
     nstate(comp_cc(Cc), Nfa, St);
 comp({lit,[C|Cs]}, Nfa, St) ->
-    foldl(fun (C, {Lf,Nfa0,St0}) ->
-		  {Cf,Nfa1,St1} = cstate(C, Nfa0, St0),
+    foldl(fun (C1, {Lf,Nfa0,St0}) ->
+		  {Cf,Nfa1,St1} = cstate(C1, Nfa0, St0),
 		  concat(Lf, Cf, Nfa1, St1)
 	  end, cstate(C, Nfa, St), Cs);
 comp(epsilon, Nfa, St) -> {epsilon,Nfa,St}.
