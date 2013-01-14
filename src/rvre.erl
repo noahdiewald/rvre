@@ -321,7 +321,7 @@ string_between(Cs1, Cs2) ->
 
 -record(thom, {n,s,fl}).			%Next state, next sub, flags
 
-comp({RE,Sc}, Fl) ->
+comp({RE,_Sc}, Fl) ->
     St0 = #thom{n=1,s=1,fl=Fl},
     {F,Nfa0,St1} = comp(RE, [], St0),
     N = St1#thom.n,
