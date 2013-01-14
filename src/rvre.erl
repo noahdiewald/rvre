@@ -101,6 +101,18 @@
 
 -export_type([syntax/0,rcomp/0]).
 
+%% parse(String) -> {ok,RegExp} | {error,Error}.
+%%  Parse a regular expression string. No flags affect the parsing.
+-spec parse(string()) -> {ok, syntax()} | {error, term()}.
+parse(Cs) -> parse1(Cs, parse_cflags([])).	%Default flags
+
+parse1(Cs, _) ->				%Flags not used here!
+    case reg(Cs) of
+	{ok,R,[]} -> {ok,{regexp,R}};
+	{ok,_R,[C|_]} -> {error,{illegal,[C]}};
+	{error,E} -> {error,E}
+    end.
+
 %% reg(Chars) -> {ok,{RegExp,SúbCount},RestChars}.
 -spec reg(string()) -> {ok, syntax(), string()} | {error, term()}.
 reg(Cs0) ->
@@ -650,18 +662,6 @@ sh_special_char($]) -> true;
 sh_special_char($}) -> true;
 sh_special_char($") -> true;
 sh_special_char(C) -> special_char(C).
-
-%% parse(String) -> {ok,RegExp} | {error,Error}.
-%%  Parse a regular expression string. No flags affect the parsing.
--spec parse(string()) -> {ok, syntax()} | {error, term()}.
-parse(Cs) -> parse1(Cs, parse_cflags([])).	%Default flags
-
-parse1(Cs, _) ->				%Flags not used here!
-    case reg(Cs) of
-	{ok,R,[]} -> {ok,{regexp,R}};
-	{ok,_R,[C|_]} -> {error,{illegal,[C]}};
-	{error,E} -> {error,E}
-    end.
 
 %% compile(String | RegExp) -> {ok,Nfa} | {error,Error}.
 %% compile(String | RegExp | NFA, Flags) -> {ok,Nfa} | {error,Error}.
