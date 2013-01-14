@@ -83,7 +83,7 @@
 %%  The grammar of the current regular expressions. The actual parser
 %%  is a recursive descent implementation of the grammar.
 
-%% reg(Chars) -> {ok,{RegExp,SúbCount},RestChars}.
+%% reg(Chars) -> {ok,{RegExp,SÃºbCount},RestChars}.
 
 reg(Cs0) ->
     case catch reg(Cs0, 0) of
@@ -520,19 +520,19 @@ comp_class([C|Crs], Last) when is_integer(C) ->
 comp_class([], Last) -> [{Last,maxchar}].
 
 %% comp_posix(Posix, CharClass) -> CharClass.
-%%  Handle POSIX character classes, use Latin-1 character set.
+%%  Handle POSIX ascii character classes.
 
 comp_posix(alnum, Cc) -> comp_posix(alpha, comp_posix(digit, Cc));
 comp_posix(alpha, Cc) -> comp_posix(upper, comp_posix(lower, Cc));
-comp_posix(blank, Cc) -> [$\s,$\t,160|Cc];
-comp_posix(cntrl, Cc) -> [{0,31},{127,159}|Cc];
+comp_posix(blank, Cc) -> [$\s,$\t|Cc];
+comp_posix(cntrl, Cc) -> [{0,31},127|Cc];
 comp_posix(digit, Cc) -> [{$0,$9}|Cc];
-comp_posix(graph, Cc) -> [{33,126},{161,255}|Cc];
-comp_posix(lower, Cc) -> [{$a,$z},{$à,$ö},{$ø,$ÿ}|Cc];
+comp_posix(graph, Cc) -> [{33,126}|Cc];
+comp_posix(lower, Cc) -> [{$a,$z}|Cc];
 comp_posix(print, Cc) -> [{32,126},{160,255}|Cc];
-comp_posix(punct, Cc) -> [{$!,$/},{$:,$?},{${,$~},{161,191}|Cc];
-comp_posix(space, Cc) -> [$\s,$\t,$\f,$\r,$\v,160|Cc];
-comp_posix(upper, Cc) -> [{$A,$Z},{$À,$Ö},{$Ø,$ß}|Cc];
+comp_posix(punct, Cc) -> [{$!,$/},{$:,$?},{${,$~}|Cc];
+comp_posix(space, Cc) -> [$\s,$\t,$\f,$\r,$\v,$\n|Cc];
+comp_posix(upper, Cc) -> [{$A,$Z}|Cc];
 comp_posix(xdigit, Cc) -> [{$a,$f},{$A,$F},{$0,$9}|Cc].
 
 %% pack_cc(CharClass) -> CharClass
