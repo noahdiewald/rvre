@@ -1,21 +1,27 @@
-%% @copyright Geoff Cant
-%% @author Geoff Cant <nem@erlang.geek.nz>
-%% @version {@vsn}, {@date} {@time}
-%% @doc 
-%% @end
 -module(rvre_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 
-regression_1_test() ->
-    ?assertMatch({match,{1,216,
-                         "<iq type=\"result\" id=\"jcm_R_0\" from=\"localdomain\" to=\"[jcm_proxy]nonode@nohost/connection from [0.37.0]\"><session xmlns=\"http://jabber.org/protocol/connectionmanager\" id=\"jcm_S_0\">\n      <create/>\n    </session></iq>"},
-                  {{4,101,
-                    " type=\"result\" id=\"jcm_R_0\" from=\"localdomain\" to=\"[jcm_proxy]nonode@nohost/connection from [0.37.0]\""},
-                   {106,106,
-                    "<session xmlns=\"http://jabber.org/protocol/connectionmanager\" id=\"jcm_S_0\">\n      <create/>\n    </session>"}}},
-                 rvre:match(<<"<iq type=\"result\" id=\"jcm_R_0\" from=\"localdomain\" to=\"[jcm_proxy]nonode@nohost/connection from [0.37.0]\"><session xmlns=\"http://jabber.org/protocol/connectionmanager\" id=\"jcm_S_0\">\n      <create/>\n    </session></iq>">>,"^[^>]*<iq([^>]*)>(.*)</iq>",[{subexpr,true}])
-                ).
+ascii_char_class_test_() ->
+    {"Ascii Character Class Tests",
+     [{"Recognize a Class",
+       ?_assertMatch({_,{_,{{_,[_,{char_class,[{ascii,upper}]},_]},_}}}, rvre:parse("^[[:upper:]]$"))},
+      {"Recognize a Class Complement", 
+       ?_assertMatch({_,{_,{{_,[_,{char_class,[{ascii,comp_upper}]},_]},_}}}, rvre:parse("^[[:^upper:]]$"))},
+      {"Both Complements are Equivalent", 
+       ?_assertEqual(rvre:compile("[^[:upper:]]"), rvre:compile("[[:^upper:]]"))},
+      {"Both Complements are Equivalent", 
+       ?_assertEqual(rvre:compile("[^[:cntrl:]]"), rvre:compile("[[:^cntrl:]]"))}
+     ]}.
 
-regression_2_test() ->
-    ?assertException(_, badarg, rvre:match(undefined, ".*")).
+low_complement_ranges_test_()->
+    {"Complements of Ranges Starting With Zero",
+     [{"A Series of Ranges",
+       ?_assertEqual([{32,57},{68,maxchar}],rvre:comp_cc([{0,31},{58,67}]))},
+      {"A Range Followed by a Single Number",
+       ?_assertEqual([{32,57},{59,maxchar}],rvre:comp_cc([{0,31},58]))},
+      {"A Single Number Followed by a Range",
+       ?_assertEqual([{1,57},{68,maxchar}],rvre:comp_cc([0,{58,67}]))},
+      {"A Single Number Followed by a Single Number",
+       ?_assertEqual([{1,57},{59,maxchar}],rvre:comp_cc([0,58]))}
+     ]}.

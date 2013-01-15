@@ -43,7 +43,11 @@
 -import(lists, [member/2,usort/2,keysort/2]).
 -import(lists, [foldl/3]).
 
-%%-compile([export_all]).
+%-compile(debug_info).
+
+-ifdef(TEST).
+-compile(export_all).
+-endif.
 
 %% This is the compile flags record which controls parser, compiler and engine.
 -record(cflags, {ignore_case=false,		%Ignore case
@@ -217,9 +221,9 @@ char_class([$]|Cs]) -> char_class(Cs, [$]]);	%Have to special case this.
 char_class(Cs) -> char_class(Cs, []).
 
 char_class("[:" ++ Cs0, Cc) ->			%Start of POSIX char class
-    case posix_cc(Cs0) of
-	{Pcl,":]" ++ Cs1} -> char_class(Cs1, [{posix,Pcl}|Cc]);
-	{_,Cs1} -> parse_error({posix_cc,string_between(Cs0, Cs1)})
+    case ascii_cc(Cs0) of
+	{Pcl,":]" ++ Cs1} -> char_class(Cs1, [{ascii,Pcl}|Cc]);
+	{_,Cs1} -> parse_error({ascii_cc,string_between(Cs0, Cs1)})
     end;
 char_class([Cf,$-,Cl|Cs], Cc) when Cf /= $], Cl /= $] ->
     if Cf =< Cl -> char_class(Cs, [{range,Cf,Cl}|Cc]); 
@@ -229,22 +233,34 @@ char_class([C|Cs], Cc) when is_integer(C), C /= $] ->
     char_class(Cs, [C|Cc]);
 char_class(Cs, Cc) -> {reverse(Cc),Cs}.		%Preserve order
 
-%% posix_cc(String) -> {PosixClass,RestString}.
+%% ascii_cc(String) -> {PosixClass,RestString}.
 %%  Handle POSIX character classes.
 
-posix_cc("alnum" ++ Cs) -> {alnum,Cs};
-posix_cc("alpha" ++ Cs) -> {alpha,Cs};
-posix_cc("blank" ++ Cs) -> {blank,Cs};
-posix_cc("cntrl" ++ Cs) -> {cntrl,Cs};
-posix_cc("digit" ++ Cs) -> {digit,Cs};
-posix_cc("graph" ++ Cs) -> {graph,Cs};
-posix_cc("lower" ++ Cs) -> {lower,Cs};
-posix_cc("print" ++ Cs) -> {print,Cs};
-posix_cc("punct" ++ Cs) -> {punct,Cs};
-posix_cc("space" ++ Cs) -> {space,Cs};
-posix_cc("upper" ++ Cs) -> {upper,Cs};
-posix_cc("xdigit" ++ Cs) -> {xdigit,Cs};
-posix_cc(Cs) -> parse_error({posix_cc,substr(Cs, 1, 5)}).
+ascii_cc("^alnum" ++ Cs) -> {comp_alnum,Cs};
+ascii_cc("^alpha" ++ Cs) -> {comp_alpha,Cs};
+ascii_cc("^blank" ++ Cs) -> {comp_blank,Cs};
+ascii_cc("^cntrl" ++ Cs) -> {comp_cntrl,Cs};
+ascii_cc("^digit" ++ Cs) -> {comp_digit,Cs};
+ascii_cc("^graph" ++ Cs) -> {comp_graph,Cs};
+ascii_cc("^lower" ++ Cs) -> {comp_lower,Cs};
+ascii_cc("^print" ++ Cs) -> {comp_print,Cs};
+ascii_cc("^punct" ++ Cs) -> {comp_punct,Cs};
+ascii_cc("^space" ++ Cs) -> {comp_space,Cs};
+ascii_cc("^upper" ++ Cs) -> {comp_upper,Cs};
+ascii_cc("^xdigit" ++ Cs) -> {comp_xdigit,Cs};
+ascii_cc("alnum" ++ Cs) -> {alnum,Cs};
+ascii_cc("alpha" ++ Cs) -> {alpha,Cs};
+ascii_cc("blank" ++ Cs) -> {blank,Cs};
+ascii_cc("cntrl" ++ Cs) -> {cntrl,Cs};
+ascii_cc("digit" ++ Cs) -> {digit,Cs};
+ascii_cc("graph" ++ Cs) -> {graph,Cs};
+ascii_cc("lower" ++ Cs) -> {lower,Cs};
+ascii_cc("print" ++ Cs) -> {print,Cs};
+ascii_cc("punct" ++ Cs) -> {punct,Cs};
+ascii_cc("space" ++ Cs) -> {space,Cs};
+ascii_cc("upper" ++ Cs) -> {upper,Cs};
+ascii_cc("xdigit" ++ Cs) -> {xdigit,Cs};
+ascii_cc(Cs) -> parse_error({ascii_cc,substr(Cs, 1, 5)}).
 
 %% special_char(Char) -> bool().
 %% These are the special characters for an ERE.
@@ -539,37 +555,57 @@ patch1([Nst|Nfa], E, B) ->
 
 comp_cc(Cc) -> comp_class(pack_cc(Cc), 0).
 
+comp_class([{C1,C2},{C3,C4}|Crs], _Last) when C1 =:= 0 ->
+    [{C2+1,C3-1}|comp_class(Crs, C4+1)];
+comp_class([{C1,C2},C3|Crs], _Last) when C1 =:= 0 ->
+    [{C2+1,C3-1}|comp_class(Crs, C3+1)];
 comp_class([{C1,C2}|Crs], Last) ->
     [{Last,C1-1}|comp_class(Crs, C2+1)];
+comp_class([C1,{C2,C3}|Crs], _Last) when C1 =:= 0 ->
+    [{1,C2-1}|comp_class(Crs, C3+1)];
+comp_class([C1,C2|Crs], _Last) when C1 =:= 0 ->
+    [{1,C2-1}|comp_class(Crs, C2+1)];
 comp_class([C|Crs], Last) when Last == C-1 ->
     [Last|comp_class(Crs, C+1)];
 comp_class([C|Crs], Last) when is_integer(C) ->
     [{Last,C-1}|comp_class(Crs, C+1)];
 comp_class([], Last) -> [{Last,maxchar}].
 
-%% comp_posix(Posix, CharClass) -> CharClass.
-%%  Handle POSIX ascii character classes.
+%% comp_ascii(Posix, CharClass) -> CharClass.
+%%  Handle ascii character classes.
 
-comp_posix(alnum, Cc) -> comp_posix(alpha, comp_posix(digit, Cc));
-comp_posix(alpha, Cc) -> comp_posix(upper, comp_posix(lower, Cc));
-comp_posix(blank, Cc) -> [$\s,$\t|Cc];
-comp_posix(cntrl, Cc) -> [{0,31},127|Cc];
-comp_posix(digit, Cc) -> [{$0,$9}|Cc];
-comp_posix(graph, Cc) -> [{33,126}|Cc];
-comp_posix(lower, Cc) -> [{$a,$z}|Cc];
-comp_posix(print, Cc) -> [{32,126},{160,255}|Cc];
-comp_posix(punct, Cc) -> [{$!,$/},{$:,$?},{${,$~}|Cc];
-comp_posix(space, Cc) -> [$\s,$\t,$\f,$\r,$\v,$\n|Cc];
-comp_posix(upper, Cc) -> [{$A,$Z}|Cc];
-comp_posix(xdigit, Cc) -> [{$a,$f},{$A,$F},{$0,$9}|Cc].
+comp_ascii(comp_alnum, Cc) -> [{0,47},{58,64},{91,96},{123,maxchar}|Cc];
+comp_ascii(comp_alpha, Cc) -> [{0,64},{91,96},{123,maxchar}|Cc];
+comp_ascii(comp_blank, Cc) -> [{0,8},{10,31},{33,maxchar}|Cc];
+comp_ascii(comp_cntrl, Cc) -> [{32,126},{128,maxchar}|Cc];
+comp_ascii(comp_digit, Cc) -> [{0,47},{58,maxchar}|Cc];
+comp_ascii(comp_graph, Cc) -> [{0,32},{127,maxchar}|Cc];
+comp_ascii(comp_lower, Cc) -> [{0,96},{123,maxchar}|Cc];
+comp_ascii(comp_print, Cc) -> [{0,31},{127,159},{256,maxchar}|Cc];
+comp_ascii(comp_punct, Cc) -> [{0,32},{48,57},{64,122},{127,maxchar}|Cc];
+comp_ascii(comp_space, Cc) -> [{0,8},{14,31},{33,maxchar}|Cc];
+comp_ascii(comp_upper, Cc) -> [{0,64},{91,maxchar}|Cc];
+comp_ascii(comp_xdigit, Cc) -> [{0,47},{58,64},{71,96},{103,maxchar}|Cc];
+comp_ascii(alnum, Cc) -> comp_ascii(alpha, comp_ascii(digit, Cc));
+comp_ascii(alpha, Cc) -> comp_ascii(upper, comp_ascii(lower, Cc));
+comp_ascii(blank, Cc) -> [$\s,$\t|Cc];
+comp_ascii(cntrl, Cc) -> [{0,31},127|Cc];
+comp_ascii(digit, Cc) -> [{$0,$9}|Cc];
+comp_ascii(graph, Cc) -> [{33,126}|Cc];
+comp_ascii(lower, Cc) -> [{$a,$z}|Cc];
+comp_ascii(print, Cc) -> [{32,126},{160,255}|Cc];
+comp_ascii(punct, Cc) -> [{$!,$/},{$:,$?},{${,$~}|Cc];
+comp_ascii(space, Cc) -> [$\s,$\t,$\f,$\r,$\v,$\n|Cc];
+comp_ascii(upper, Cc) -> [{$A,$Z}|Cc];
+comp_ascii(xdigit, Cc) -> [{$a,$f},{$A,$F},{$0,$9}|Cc].
 
 %% pack_cc(CharClass) -> CharClass
 %%  Pack and optimise a character class specification (bracket
 %%  expression). First sort it and then compact it.
 
 pack_cc(Cc0) ->
-    %% First expand the posix classes and remove range tag ...
-    Cc1 = foldl(fun ({posix,Pcl}, Cc) -> comp_posix(Pcl, Cc);
+    %% First expand the ascii classes and remove range tag ...
+    Cc1 = foldl(fun ({ascii,Pcl}, Cc) -> comp_ascii(Pcl, Cc);
 		    ({range,Cf,Cl}, Cc) -> [{Cf,Cl}|Cc];
 		    (C, Cc) -> [C|Cc]
 		end, [], Cc0),
@@ -687,7 +723,7 @@ format_error({interval_range,What}) ->
     ["illegal interval range",io_lib:write_string(What)];
 format_error({illegal_char,What}) -> ["illegal character `",What,"'"];
 format_error({unterminated,What}) -> ["unterminated `",What,"'"];
-format_error({posix_cc,What}) ->
+format_error({ascii_cc,What}) ->
     ["illegal POSIX character class ",io_lib:write_string(What)];
 format_error({char_class,What}) ->
     ["illegal character class ",io_lib:write_string(What)].
