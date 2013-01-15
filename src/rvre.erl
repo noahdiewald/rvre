@@ -23,7 +23,7 @@
 %% ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 %% POSSIBILITY OF SUCH DAMAGE.
 
-%% File:    re.erl
+%% File:    rvre.erl
 %% Author:  Robert Virding
 %% Purpose: POSIX regular expression matching
 %%
@@ -43,7 +43,7 @@
 -import(lists, [member/2,usort/2,keysort/2]).
 -import(lists, [foldl/3]).
 
-%-compile(debug_info).
+-compile(debug_info).
 
 -ifdef(TEST).
 -compile(export_all).
@@ -99,9 +99,10 @@
 -type optional() :: {optional, single()}.
 -type interval() :: {interval, single(), integer(), integer()}.
 -type repeat() :: kclosure()|pclosure()|optional()|interval()|single().
--type seq() :: {seq, [repeat()]}.
--type rcomp() :: repeat()|seq()|alt().
+-type seq() :: {seq, [rcomp()]}.
+-type rcomp() :: repeat()|seq()|alt()|single().
 -type syntax() :: {regexp, {rcomp(), integer()}}.
+-type parse_error() :: {interval_range,string()}|{unterminated,string()}|{illegal_char,string()}|missing_char|{ascii_cc,string()}|{char_class,string()}.
 
 -export_type([syntax/0,rcomp/0]).
 
@@ -116,17 +117,20 @@ parse(Cs) ->
     end.
 
 %% reg(Chars) -> {ok,{RegExp,SúbCount},RestChars}.
--spec reg(string()) -> {ok, syntax(), string()} | {error, term()}.
+-spec reg(string()) -> {ok, rcomp(), string()} | {error, term()}.
 reg(Cs0) ->
     case catch reg(Cs0, 0) of
         {RE,Sc,Cs1} -> {ok,{RE,Sc},Cs1};
         {parse_error,E} -> {error,E}
     end.
 
+-spec reg(string(), integer()) -> {rcomp(), integer(), string()}.
 reg(Cs, Sn) -> alt(Cs, Sn).
 
+-spec parse_error(parse_error()) -> no_return().
 parse_error(E) -> throw({parse_error,E}).
 
+-spec alt(string(), integer()) -> {rcomp(), integer(), string()}.
 alt(Cs0, Sn0) ->
     {L,Sn1,Cs1} = seq(Cs0, Sn0),
     case alt1(Cs1, Sn1) of
@@ -134,23 +138,17 @@ alt(Cs0, Sn0) ->
         {Rs,Sn2,Cs2} -> {{alt,[L|Rs]},Sn2,Cs2}
     end.
 
+-spec alt1(string(), integer()) -> {[rcomp()], integer(), string()}.
 alt1([$||Cs0], Sn0) ->
     {L,Sn1,Cs1} = seq(Cs0, Sn0),
     {Rs,Sn2,Cs2} = alt1(Cs1, Sn1),
     {[L|Rs],Sn2,Cs2};
 alt1(Cs, Sn) -> {[],Sn,Cs}.
 
-%% Parse a sequence of regexps. Don't allow the empty sequence.
-%% seq(Cs0, Sn0) ->
-%%     {L,Sn1,Cs1} = repeat(Cs0, Sn0),
-%%     case seq1(Cs1, Sn1) of
-%%         {[],Sn2,Cs2} -> {L,Sn2,Cs2};
-%%         {Rs,Sn2,Cs2} -> {{seq,[L|Rs]},Sn2,Cs2}
-%%     end.
-
 %% seq(Chars, SubNumber) -> {RegExp,SubNumber,Chars}.
 %% Parse a sequence of regexps. Allow the empty sequence, returns epsilon.
 
+-spec seq(string(), integer()) -> {seq()|single(), integer(), string()}.
 seq(Cs0, Sn0) ->
     case seq1(Cs0, Sn0) of
         {[],Sn1,Cs1} -> {epsilon,Sn1,Cs1};
@@ -158,16 +156,19 @@ seq(Cs0, Sn0) ->
         {Rs,Sn1,Cs1} -> {{seq,Rs},Sn1,Cs1}
     end.
 
+-spec seq1(string(), integer()) -> {[rcomp()], integer(), string()}.
 seq1([C|_]=Cs0, Sn0) when C /= $|, C /= $) ->
     {L,Sn1,Cs1} = repeat(Cs0, Sn0),
     {Rs,Sn2,Cs2} = seq1(Cs1, Sn1),
     {[L|Rs],Sn2,Cs2};
 seq1(Cs, Sn) -> {[],Sn,Cs}.
 
+-spec repeat(string(), integer()) -> {single()|repeat(), integer(), repeat()}.
 repeat(Cs0, Sn0) ->
     {S,Sn1,Cs1} = single(Cs0, Sn0),
     repeat1(Cs1, Sn1, S).
 
+-spec repeat1(string(), integer(), single()|repeat()) -> {single()|repeat(), integer(), string()}.
 repeat1([$*|Cs], Sn, S) -> repeat1(Cs, Sn, {kclosure,S});
 repeat1([$+|Cs], Sn, S) -> repeat1(Cs, Sn, {pclosure,S});
 repeat1([$?|Cs], Sn, S) -> repeat1(Cs, Sn, {optional,S});
@@ -183,7 +184,7 @@ repeat1(Cs, Sn, S) -> {S,Sn,Cs}.
 
 %% single(Chars, SubNumber) -> {RegExp,SubNumber,Chars}.
 %% Parse a single regexp.
-
+-spec single(string(), integer()) -> {single(), integer(), string()}.
 single([$(|Cs0], Sn0) ->                        % $)
     Sn1 = Sn0 + 1,
     case reg(Cs0, Sn1) of
@@ -216,10 +217,11 @@ single([], _) ->
 
 %% char_class(Chars) -> {CharClass,Chars}.
 %% Parse a character class.
-
+-spec char_class(string()) -> {string(), string()}.
 char_class([$]|Cs]) -> char_class(Cs, [$]]);        %Have to special case this.
 char_class(Cs) -> char_class(Cs, []).
 
+-spec char_class(string(), string()) -> {string(), string()}.
 char_class("[:" ++ Cs0, Cc) ->                        %Start of POSIX char class
     case ascii_cc(Cs0) of
         {Pcl,":]" ++ Cs1} -> char_class(Cs1, [{ascii,Pcl}|Cc]);
@@ -266,6 +268,7 @@ ascii_cc(Cs) -> parse_error({ascii_cc,substr(Cs, 1, 5)}).
 %% These are the special characters for an ERE.
 %% N.B. ]}) are only special in the context after [{(.
 
+-spec special_char(char()) -> boolean().
 special_char($^) -> true;
 special_char($.) -> true;
 special_char($[) -> true;
